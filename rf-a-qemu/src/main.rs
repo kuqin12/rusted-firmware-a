@@ -7,6 +7,8 @@
 #![no_main]
 #![no_std]
 
+#[cfg(feature = "transfer_list")]
+mod bl2_params;
 mod holding_pen;
 mod psci;
 
@@ -20,6 +22,8 @@ use core::arch::asm;
 use core::{mem::offset_of, ptr::NonNull};
 #[cfg(feature = "pauth")]
 use rf_a_core::reexports::arm_sysregs::el0::accessors::read_cntpct_el0;
+#[cfg(feature = "transfer_list")]
+use rf_a_core::reexports::spin::Once;
 use rf_a_core::{
     all_asm, asm_macros_common, asm_macros_common_purge,
     context::{CoreIndex, EntryPointInfo},
@@ -84,6 +88,10 @@ const BL32_BASE: usize = 0x0e10_0000;
 const BL31_TRANSFER_LIST_SIZE: usize = 0x0000_8000;
 #[cfg(feature = "transfer_list")]
 const BL31_TRANSFER_BASE: u64 = (BL32_BASE - BL31_TRANSFER_LIST_SIZE) as u64;
+#[cfg(feature = "transfer_list")]
+static BL32_HANDOFF: Once<[u64; 4]> = Once::new();
+#[cfg(feature = "transfer_list")]
+static BL33_HANDOFF: Once<EntryPointInfo> = Once::new();
 
 const GICD_BASE: usize = 0x0800_0000;
 const GICR_BASE: usize = 0x080A_0000;
@@ -136,6 +144,11 @@ define_errata_list!(Qemu, []);
 define_early_mapping!(
     Qemu,
     [
+        #[cfg(feature = "transfer_list")]
+        EarlyRegion {
+            address_range: bl2_params::BL2_BASE..BL31_BASE,
+            attributes: rf_a_core::pagetable::MT_RO_DATA_EL3
+        },
         EarlyRegion {
             address_range: BL31_BASE..BL32_BASE,
             attributes: MT_MEMORY_EL3
@@ -232,6 +245,25 @@ unsafe impl Platform for Qemu {
                 LockedWriter::new(Uart::new(uart_pointer)),
             ))
             .expect("Failed to initialise logger");
+
+        #[cfg(feature = "transfer_list")]
+        BL33_HANDOFF.call_once(|| bl2_params::bl33_entry(_arg0 as usize));
+        #[cfg(feature = "transfer_list")]
+        BL32_HANDOFF.call_once(|| {
+            use tf_firmware_handoff::{TransferList, entries::DtFormattedSpmcManifest};
+
+            assert_eq!(_arg1, 0x1_4a0f_b10b, "invalid AArch64 transfer-list convention");
+            assert_eq!(_arg3, BL31_TRANSFER_BASE, "unexpected secure transfer-list address");
+            // SAFETY: BL2 initialized this reserved SRAM window. The early mapping identity-maps
+            // it read/write, outside BL31 (including BSS2), and BL32 has not started yet.
+            let region = unsafe {
+                core::slice::from_raw_parts_mut(_arg3 as *mut u8, BL31_TRANSFER_LIST_SIZE)
+            };
+            let list = TransferList::new(region).expect("invalid secure transfer list");
+            let manifest = list.get::<DtFormattedSpmcManifest>().expect("SPMC manifest missing");
+            assert!(!manifest.manifest_image.is_empty(), "empty SPMC manifest");
+            [manifest.manifest_image.as_ptr() as u64, _arg1, 0, _arg3]
+        });
     }
 
     fn init(_arg0: u64, _arg1: u64, _arg2: u64, _arg3: u64) {
@@ -291,22 +323,20 @@ unsafe impl Platform for Qemu {
 
     fn secure_entry_point() -> EntryPointInfo {
         let core_linear_id = QemuCoreIndex::local_index() as u64;
+        #[cfg(feature = "transfer_list")]
+        let [x0, x1, x2, x3] = *BL32_HANDOFF.get().expect("BL32 handoff not initialized");
+        #[cfg(not(feature = "transfer_list"))]
+        let [x0, x1, x2, x3] = [TOS_FW_CONFIG_ADDRESS, HW_CONFIG_ADDRESS, 0, 0];
         EntryPointInfo {
             pc: 0x0e10_0000,
-            args: [
-                TOS_FW_CONFIG_ADDRESS,
-                HW_CONFIG_ADDRESS,
-                0,
-                0,
-                core_linear_id,
-                0,
-                0,
-                0,
-            ],
+            args: [x0, x1, x2, x3, core_linear_id, 0, 0, 0],
         }
     }
 
     fn non_secure_entry_point() -> EntryPointInfo {
+        #[cfg(feature = "transfer_list")]
+        return BL33_HANDOFF.get().expect("BL33 handoff not initialized").clone();
+        #[cfg(not(feature = "transfer_list"))]
         EntryPointInfo {
             pc: 0x6000_0000,
             args: [DTB_ADDRESS, 0, 0, 0, 0, 0, 0, 0],

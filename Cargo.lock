@@ -399,6 +399,7 @@ dependencies = [
  "arm-pl061",
  "rf-a-build",
  "rf-a-core",
+ "tf-firmware-handoff",
 ]
 
 [[package]]
@@ -482,6 +483,18 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "tf-firmware-handoff"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4839acc1f5405583dc27aba7dd0729168d6e52a876e1a3fda70b843278cec240"
+dependencies = [
+ "bitflags",
+ "num_enum",
+ "thiserror",
+ "zerocopy",
 ]
 
 [[package]]
