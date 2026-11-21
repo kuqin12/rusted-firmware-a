@@ -69,8 +69,16 @@ const SHARED_RAM: MemoryRegion =
     MemoryRegion::new(SHARED_RAM_BASE, SHARED_RAM_BASE + SHARED_RAM_SIZE);
 const DEVICE0: MemoryRegion = MemoryRegion::new(DEVICE0_BASE, DEVICE0_BASE + DEVICE0_SIZE);
 const DEVICE1: MemoryRegion = MemoryRegion::new(DEVICE1_BASE, DEVICE1_BASE + DEVICE1_SIZE);
+#[cfg(not(feature = "transfer_list"))]
 const BL31_BASE: usize = 0x0e09_0000;
+#[cfg(feature = "transfer_list")]
+const BL31_BASE: usize = 0x0e08_8000;
 const BL32_BASE: usize = 0x0e10_0000;
+
+#[cfg(feature = "transfer_list")]
+const BL31_TRANSFER_LIST_SIZE: usize = 0x0000_8000;
+#[cfg(feature = "transfer_list")]
+const BL31_TRANSFER_BASE: u64 = (BL32_BASE - BL31_TRANSFER_LIST_SIZE) as u64;
 
 const GICD_BASE: usize = 0x0800_0000;
 const GICR_BASE: usize = 0x080A_0000;
@@ -89,11 +97,14 @@ const GICR_BASE_ADDRESS: *mut GicrSgi = GICR_BASE as _;
 ///
 /// The QEMU virt platform
 /// [loads it at the start of RAM](https://www.qemu.org/docs/master/system/arm/virt.html#hardware-configuration-information-for-bare-metal-programming).
+#[cfg(not(feature = "transfer_list"))]
 const DTB_ADDRESS: u64 = 0x4000_0000;
 
 // TODO: Use the correct addresses here.
 /// The physical address of the SPMC manifest blob.
-const TOS_FW_CONFIG_ADDRESS: u64 = 0;
+#[cfg(not(feature = "transfer_list"))]
+const TOS_FW_CONFIG_ADDRESS: u64 = 0x0e00_2000;
+#[cfg(not(feature = "transfer_list"))]
 const HW_CONFIG_ADDRESS: u64 = 0;
 
 /// The number of CPU clusters.
