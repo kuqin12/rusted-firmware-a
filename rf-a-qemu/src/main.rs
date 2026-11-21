@@ -15,7 +15,11 @@ use self::{
     psci::{PSCI_STATE_COUNT, QemuPsciPlatformImpl, gpio_init},
 };
 use arm_pl011_uart::{PL011Registers, Uart, UniqueMmioPointer};
+#[cfg(feature = "pauth")]
+use core::arch::asm;
 use core::{mem::offset_of, ptr::NonNull};
+#[cfg(feature = "pauth")]
+use rf_a_core::reexports::arm_sysregs::el0::accessors::read_cntpct_el0;
 use rf_a_core::{
     all_asm, asm_macros_common, asm_macros_common_purge,
     context::{CoreIndex, EntryPointInfo},
