@@ -22,6 +22,7 @@ use rf_a_core::{
     cpu::qemu_max::QemuMax,
     cpu_extensions::{
         CpuExtension, csv2_2::Csv2_2, gcs::Gcs, hcx::Hcx, sctlr2::Sctlr2, simd::Simd,
+        mte2::MemoryTagging,
     },
     crash_console::pl011::Pl011CrashConsole,
     debug::DEBUG,
@@ -212,7 +213,8 @@ unsafe impl Platform for Qemu {
     };
 
     const CPU_EXTENSIONS: &'static [&'static dyn CpuExtension] =
-        &[&Csv2_2, &Gcs, &Hcx, &Simd::sve(512, false), &Sctlr2];
+        &[&Csv2_2, &Gcs, &Hcx, &Simd::sve(512, false), 
+        &MemoryTagging, &Sctlr2];
 
     fn init_with_early_mapping(_arg0: u64, _arg1: u64, _arg2: u64, _arg3: u64) {
         // SAFETY: `PL011_BASE_ADDRESS` is the base address of a PL011 device, and nothing else
