@@ -132,7 +132,7 @@ impl Service for Spmd {
                 };
 
                 if has_msg {
-                    msg.to_regs(version, smc_regs);
+                    encode_secure_response(msg, next_world, version, smc_regs);
                 } else {
                     regs.mark_empty();
                 }
@@ -145,6 +145,18 @@ impl Service for Spmd {
                 World::Secure
             }
         }
+    }
+}
+
+fn encode_secure_response(msg: &Interface, next: World, version: Version, regs: &mut [u64]) {
+    if next == World::NonSecure && matches!(msg, Interface::Yield { is_32bit: true }) {
+        // arm-ffa 0.5 models FFA_YIELD as a request without arguments. When Hafnium yields
+        // to its scheduler, W1 names the endpoint/vCPU to resume and W2/W3 carry the timeout.
+        let yield_args = [regs[1], regs[2], regs[3]].map(|arg| arg & u64::from(u32::MAX));
+        msg.to_regs(version, regs);
+        regs[1..4].copy_from_slice(&yield_args);
+    } else {
+        msg.to_regs(version, regs);
     }
 }
 
@@ -655,6 +667,21 @@ impl PsciSpmInterface for Spmd {
 /// Fake SPM implementation for tests.
 #[cfg(test)]
 pub(crate) struct TestSpm;
+
+#[test]
+fn yield_to_scheduler_preserves_only_defined_w_registers() {
+    let mut regs = [u64::MAX; 8];
+    regs[1] = 0xffff_ffff_8002_0000;
+    regs[2] = 0xffff_ffff_0000_0123;
+    regs[3] = 0xffff_ffff_0000_0456;
+    encode_secure_response(
+        &Interface::Yield { is_32bit: true },
+        World::NonSecure,
+        Spmd::VERSION,
+        &mut regs,
+    );
+    assert_eq!(regs, [0x8400_006c, 0x8002_0000, 0x123, 0x456, 0, 0, 0, 0]);
+}
 
 #[cfg(test)]
 impl PsciSpmInterface for TestSpm {
