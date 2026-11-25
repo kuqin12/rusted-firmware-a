@@ -4,7 +4,7 @@
 
 use super::{
     CLUSTER_COUNT, GIC, MAX_CPUS_PER_CLUSTER, Qemu, QemuCoreIndex,
-    holding_pen::{hold_pen_signal, secondary_cold_boot_setup},
+    holding_pen::{hold_pen_signal, secondary_cold_boot_setup, hold_pen_signal_suspend},
 };
 use arm_pl061::{PL061, PL061Registers, UniqueMmioPointer};
 use core::ptr::NonNull;
@@ -219,7 +219,9 @@ impl
             QemuPowerState,
         >,
     ) {
-        *self.per_cpu_powerdown_kinds[QemuCoreIndex::local_index()].lock() = PowerDownKind::Suspend;
+        let pos = QemuCoreIndex::local_index();
+        *self.per_cpu_powerdown_kinds[pos].lock() = PowerDownKind::Suspend;
+        hold_pen_signal_suspend(pos, bl31_warm_entrypoint::<Qemu>);
     }
 
     fn power_domain_suspend_finish(
@@ -279,7 +281,7 @@ impl
             // SAFETY: `bl31_warmboot_entrypoint` and `disable_mmu_el3` are trusted assembly.
             unsafe {
                 disable_mmu_el3();
-                bl31_warm_entrypoint::<Qemu>();
+                secondary_cold_boot_setup();
             }
         }
     }
