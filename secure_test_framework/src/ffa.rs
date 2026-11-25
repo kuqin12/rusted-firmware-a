@@ -303,12 +303,12 @@ pub fn el3_intr_handle() -> Result<Interface, Error> {
 
 pub fn call(interface: Interface) -> Result<Interface, Error> {
     let regs = call_raw(interface);
-    Interface::from_regs(FFA_VERSION, &regs)
+    Interface::try_from(&regs)
 }
 
 fn call_raw(interface: Interface) -> [u64; 18] {
     let function_id = u32::from(interface.function_id().unwrap());
     let mut regs = [0; 18];
-    interface.to_regs(FFA_VERSION, &mut regs);
+    interface.to_regs(&mut regs);
     smc64(function_id, regs[1..].try_into().unwrap())
 }

@@ -42,6 +42,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "arm-ffa"
+version = "0.6.0"
+dependencies = [
+ "num_enum",
+ "thiserror",
+ "uuid",
+ "zerocopy",
+]
+
+[[package]]
 name = "arm-fvp-base-pac"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -364,7 +374,7 @@ name = "rf-a-core"
 version = "0.1.0"
 dependencies = [
  "aarch64-paging",
- "arm-ffa",
+ "arm-ffa 0.6.0",
  "arm-gic",
  "arm-psci",
  "arm-rmi",
@@ -408,7 +418,7 @@ version = "0.1.0"
 dependencies = [
  "aarch64-paging",
  "aarch64-rt",
- "arm-ffa",
+ "arm-ffa 0.5.0",
  "arm-generic-timer",
  "arm-gic",
  "arm-pl011-uart",
